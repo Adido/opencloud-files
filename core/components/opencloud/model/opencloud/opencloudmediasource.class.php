@@ -306,8 +306,11 @@ $this->logger("container: $container");
 
         $newPath = $parentContainer.trim($name,'/');
 
-        $mycontainer = $this->objectStore->Container();
-        $mycontainer->Create(array('name'=>$newPath));
+        $folder = $this->container->DataObject();
+        $folder->name = $newPath;
+        $folder->content_type = 'application/directory';
+
+        $ok = $folder->Create();
 
         $this->xpdo->logManagerAction('directory_create','',$newPath);
         return true;
@@ -529,9 +532,7 @@ $this->logger("container: $container");
 
         $filePath = $objectPath.trim($name,'/');
 
-        $mypicture = $mycontainer->DataObject();
-
-        $mypicture->SetData($content);
+        $mypicture = $this->container->DataObject();
 
         $ok = $mypicture->Create(
             array('name'=>$name, 'content_type'=> $this->getContentType($ext)), $filePath);
