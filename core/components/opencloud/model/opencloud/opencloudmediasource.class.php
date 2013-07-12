@@ -398,17 +398,22 @@ $this->logger("container: $container");
      */
     public function renameObject($oldPath,$newName) {
         try {
-            $obj = new CF_Object($this->container,$oldPath,true);
+            $obj = $this->container->DataObject($oldPath);
         }
         catch (NoSuchObjectException $e) {
-            $this->addError('file',$this->xpdo->lexicon('file_folder_err_ns').': '.$oldPath);
+            $this->addError('file',$this->xpdo->lexicon('file_folder_err_ns').': '.$objectPath);
             return false;
         }
-    
+
         $dir = dirname($oldPath);
         $newPath = ($dir != '.' ? $dir.'/' : '').$newName;
 
-        $moved = $this->container->move_object_to($oldPath, $this->container, $newPath);
+        $mypicture = $this->container->DataObject();
+        $mypicture->name = $newPath;
+        $mypicture->Create();
+
+        $moved = $obj->copy($mypicture);
+
         if (!$moved) {
             $this->addError('file',$this->xpdo->lexicon('file_folder_err_rename').': '.$oldPath);
             return false;
@@ -460,8 +465,6 @@ $this->logger("container: $container");
         if ($objectPath == '/' || $objectPath == '.') $objectPath = '';
 
         $filePath = $objectPath.trim($name,'/');
-
-$this->logger('up: '.$filePath);
 
         $mypicture = $mycontainer->DataObject();
 
