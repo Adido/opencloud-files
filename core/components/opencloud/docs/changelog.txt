@@ -1,0 +1,5 @@
+Changelog for opencloud-files.
+
+0.1.0 beta 1 (11/07/2013)
+===============================
+* Initial release
