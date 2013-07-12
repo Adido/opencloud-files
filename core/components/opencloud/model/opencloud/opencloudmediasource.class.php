@@ -346,26 +346,6 @@ $this->logger("container: $container");
      */
     public function renameContainer($oldPath,$newName) {
         return false; //TODO: Need manual move all files in container??
-        try {
-            $obj = new CF_Object($this->container,$oldPath,true);
-        }
-        catch (NoSuchObjectException $e) {
-            $this->addError('file',$this->xpdo->lexicon('file_folder_err_ns').': '.$oldPath);
-            return false;
-        }
-    
-        $dir = dirname($oldPath);
-        $newPath = ($dir != '.' ? $dir.'/' : '').$newName;
-
-        $moved = $this->container->move_object_to($oldPath, $this->container, $newPath);
-        if (!$moved) {
-            $this->addError('file',$this->xpdo->lexicon('file_folder_err_rename').': '.$oldPath);
-            return false;
-        }
-
-        $this->xpdo->logManagerAction('directory_rename','',$oldPath);
-        return $moved;
-
     }
 
     /**
