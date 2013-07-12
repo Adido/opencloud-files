@@ -324,7 +324,7 @@ $this->logger("container: $container");
      */
     public function removeContainer($path) {
         try {
-            $container = $this->objectStore->Container($path);
+            $container = $this->container->DataObject($path);
             $container->Delete();
         }
         catch (NoSuchObjectException $e) {
