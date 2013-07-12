@@ -461,12 +461,16 @@ $this->logger("container: $container");
 
         $filePath = $objectPath.trim($name,'/');
 
-        $obj = new CF_Object($this->container,$filePath,false);
+$this->logger('up: '.$filePath);
 
-        /* create file */
-        $ext = pathinfo($name, PATHINFO_EXTENSION);
-        $obj->content_type = $this->getContentType($ext);
-        if (!$obj->write($content)) {
+        $mypicture = $mycontainer->DataObject();
+
+        $mypicture->SetData($content);
+
+        $ok = $mypicture->Create(
+            array('name'=>$name, 'content_type'=> $this->getContentType($ext)), $filePath);
+
+        if (!$ok) {
             $this->addError('name',$this->xpdo->lexicon('file_err_nf').': '.$filePath);
             return false;
         }
@@ -520,10 +524,8 @@ $this->logger("container: $container");
             $newPath = $container.$file['name'];
 
 
-            $obj = new CF_Object($this->container, $newPath);
-            $obj->content_type = $this->getContentType($ext);
-            $obj->content_length = $size;
-            $uploaded = $obj->load_from_filename($file['tmp_name']);
+            $mypicture = $this->container->DataObject();
+            $uploaded = $mypicture->Create(array('name'=>$newPath, 'content_type'=> $this->getContentType($ext)), $file['tmp_name']);
 
             if (!$uploaded) {
                 $this->addError('path',$this->xpdo->lexicon('file_err_upload'));
