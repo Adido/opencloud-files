@@ -29,11 +29,11 @@ class OpencloudMediaSource extends modMediaSource implements modMediaSourceInter
         $this->set('is_stream',false);
     }
 
-public function logger($str) {
-    $fp = fopen('/tmp/logger.txt', 'a');
-    fwrite($fp, $str."\n");
-    fclose($fp);
-}
+    public function logger($str) {
+        $fp = fopen('/tmp/logger.txt', 'a');
+        fwrite($fp, $str."\n");
+        fclose($fp);
+    }
 
     /**
      * Initializes Opencloud media class, connect and get container
@@ -49,10 +49,10 @@ public function logger($str) {
         $apiKey = $this->xpdo->getOption('api_key',$properties,'');
         $authentication_service = $this->xpdo->getOption('authentication_service',$properties,'');
         $container = $this->xpdo->getOption('container',$properties,'');
-$this->logger("username: $username");
-$this->logger("api_key: $apiKey");
-$this->logger("authentication_service: $authentication_service");
-$this->logger("container: $container");
+// $this->logger("username: $username");
+// $this->logger("api_key: $apiKey");
+// $this->logger("authentication_service: $authentication_service");
+// $this->logger("container: $container");
 
 
         include_once dirname(dirname(__FILE__)).'/php-opencloud-1.5.8/lib/php-opencloud.php';
@@ -104,14 +104,14 @@ $this->logger("container: $container");
 
     /**
      * Get a list of objects from within a bucket
-     * @param string $dir
+     * @param string $path
      * @return array
      */
-    public function getOpencloudObjectList($dir) {
-        $path = !empty($dir)?ltrim($dir,'/'):'';
+    public function getOpencloudObjectList($path) {
+        // $this->logger( "getOpencloudObjectList: $path");
 
-        $objlist = $this->container->ObjectList(array("delimiter" => "/", "prefix" => $path));
-        return $objects;
+        $objlist = $this->container->ObjectList(array("delimiter" => "/", "prefix" => ($path ? "$path/" : '')));
+        return $objlist;
     }
 
 
@@ -131,8 +131,9 @@ $this->logger("container: $container");
      */
     public function getContainerList($path) {
         $path = trim($path,"/");
-        $this->logger( "start paths: $path");
+        // $this->logger( "getContainerList: $path");
         $properties = $this->getPropertyList();
+        $hideFiles = !empty($properties['hideFiles']) && $properties['hideFiles'] != 'false' ? true : false;
 
          // get list of all files
         $objlist = $this->container->ObjectList(array("delimiter" => "/", "prefix" => ($path ? "$path/" : '')));
@@ -163,7 +164,7 @@ $this->logger("container: $container");
                     'perms' => '',
                 );
                 $directories[$currentPath]['menu'] = array('items' => $this->getListContextMenu($currentPath,$isDir,$directories[$currentPath], false));
-            } else {
+            } elseif(!$hideFiles) {
 
                 $files[$currentPath] = array(
                     'id' => $currentPath,
@@ -288,12 +289,108 @@ $this->logger("container: $container");
      * @return array
      */
     public function getObjectsInContainer($path) {
-        $this->logger('getPath', $path);
+        $this->logger('getObjectsInContainer: '. $path);
         $list = $this->getOpencloudObjectList($path);
         $properties = $this->getPropertyList();
 
-        return false;
-    }
+
+        /* get default settings */
+        $use_multibyte = $this->ctx->getOption('use_multibyte', false);
+        $encoding = $this->ctx->getOption('modx_charset', 'UTF-8');
+        $containerUrl = rtrim($properties['url'],'/').'/';
+        $allowedFileTypes = $this->getOption('allowedFileTypes',$this->properties,'');
+        $allowedFileTypes = !empty($allowedFileTypes) && is_string($allowedFileTypes) ? explode(',',$allowedFileTypes) : $allowedFileTypes;
+        $imageExtensions = $this->getOption('imageExtensions',$this->properties,'jpg,jpeg,png,gif');
+        $imageExtensions = explode(',',$imageExtensions);
+        $thumbnailType = $this->getOption('thumbnailType',$this->properties,'png');
+        $thumbnailQuality = $this->getOption('thumbnailQuality',$this->properties,90);
+        $skipFiles = $this->getOption('skipFiles',$this->properties,'.svn,.git,_notes,.DS_Store');
+        $skipFiles = explode(',',$skipFiles);
+        $skipFiles[] = '.';
+        $skipFiles[] = '..';
+
+        /* iterate */
+        $files = array();
+        while($obj = $list->Next()) {
+            $objectUrl = $containerUrl.trim($obj->name,'/');
+            $baseName = basename($obj->name);
+            if($obj->content_type == "application/directory") $obj->subdir = $obj->name;
+
+            $isDir = isset($obj->subdir);
+
+            if (in_array($obj->name,$skipFiles)) continue;
+
+            if (!$isDir) {
+                $fileArray = array(
+                    'id' => $obj->name,
+                    'name' => $baseName,
+                    'url' => $objectUrl,
+                    'relativeUrl' => $objectUrl,
+                    'fullRelativeUrl' => $objectUrl,
+                    'pathname' => $objectUrl,
+                    'size' => $obj->content_length,
+                    'leaf' => true,
+                    'menu' => array(
+                        array('text' => $this->xpdo->lexicon('file_remove'),'handler' => 'this.removeFile'),
+                    ),
+                );
+
+                $fileArray['ext'] = pathinfo($baseName,PATHINFO_EXTENSION);
+                $fileArray['ext'] = $use_multibyte ? mb_strtolower($fileArray['ext'],$encoding) : strtolower($fileArray['ext']);
+                $fileArray['cls'] = 'icon-'.$fileArray['ext'];
+
+                if (!empty($allowedFileTypes) && !in_array($fileArray['ext'],$allowedFileTypes)) continue;
+
+                /* get thumbnail */
+                if (in_array($fileArray['ext'],$imageExtensions)) {
+                    $imageWidth = $this->ctx->getOption('filemanager_image_width', 400);
+                    $imageHeight = $this->ctx->getOption('filemanager_image_height', 300);
+                    $thumbHeight = $this->ctx->getOption('filemanager_thumb_height', 60);
+                    $thumbWidth = $this->ctx->getOption('filemanager_thumb_width', 80);
+
+                    $size = @getimagesize($objectUrl);
+                    if (is_array($size)) {
+                        $imageWidth = $size[0] > 800 ? 800 : $size[0];
+                        $imageHeight = $size[1] > 600 ? 600 : $size[1];
+                    }
+
+                    /* ensure max h/w */
+                    if ($thumbWidth > $imageWidth) $thumbWidth = $imageWidth;
+                    if ($thumbHeight > $imageHeight) $thumbHeight = $imageHeight;
+
+                    /* generate thumb/image URLs */
+                    $thumbQuery = http_build_query(array(
+                        'src' => $obj->name,
+                        'w' => $thumbWidth,
+                        'h' => $thumbHeight,
+                        'f' => $thumbnailType,
+                        'q' => $thumbnailQuality,
+                        'HTTP_MODAUTH' => $modAuth,
+                        'wctx' => $this->ctx->get('key'),
+                        'source' => $this->get('id'),
+                    ));
+                    $imageQuery = http_build_query(array(
+                        'src' => $obj->name,
+                        'w' => $imageWidth,
+                        'h' => $imageHeight,
+                        'HTTP_MODAUTH' => $modAuth,
+                        'f' => $thumbnailType,
+                        'q' => $thumbnailQuality,
+                        'wctx' => $this->ctx->get('key'),
+                        'source' => $this->get('id'),
+                    ));
+                    $fileArray['thumb'] = $this->ctx->getOption('connectors_url', MODX_CONNECTORS_URL).'system/phpthumb.php?'.urldecode($thumbQuery);
+                    $fileArray['image'] = $this->ctx->getOption('connectors_url', MODX_CONNECTORS_URL).'system/phpthumb.php?'.urldecode($imageQuery);
+
+                } else {
+                    $fileArray['thumb'] = $this->ctx->getOption('manager_url', MODX_MANAGER_URL).'templates/default/images/restyle/nopreview.jpg';
+                    $fileArray['thumbWidth'] = $this->ctx->getOption('filemanager_thumb_width', 80);
+                    $fileArray['thumbHeight'] = $this->ctx->getOption('filemanager_thumb_height', 60);
+                }
+                $files[] = $fileArray;
+            }
+        }
+        return $files;    }
 
     /**
      * Create a Container
@@ -923,6 +1020,7 @@ $this->logger("container: $container");
      * @return array
      */
     public function getObjectContents($objectPath) {
+        // $this->logger('getObjectContents: '. $objectPath);
         $properties = $this->getPropertyList();
         try {
             $obj = new CF_Object($this->container,$objectPath, true);
