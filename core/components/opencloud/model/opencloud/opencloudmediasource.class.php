@@ -441,7 +441,7 @@ $this->logger("container: $container");
         try {
             $obj_from = $this->container->DataObject($from);
         }
-        catch (NoSuchObjectException $e) {
+        catch (Exception $e) {
             $this->addError('file',$this->xpdo->lexicon('file_err_ns').': '.$from);
             return false;
         }
