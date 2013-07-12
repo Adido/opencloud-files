@@ -419,11 +419,74 @@ $this->logger("container: $container");
             return false;
         }
 
+        $obj->Delete();
+
         $this->xpdo->logManagerAction('file_rename','',$oldPath);
         return $moved;
 
     }
 
+    /**
+     * Move a file or folder to a specific location
+     *
+     * @param string $from The location to move from
+     * @param string $to The location to move to
+     * @param string $point
+     * @return boolean
+     */
+    public function moveObject($from,$to,$point = 'append') {
+        $this->xpdo->lexicon->load('source');
+        $success = false;
+
+        try {
+            $obj_from = $this->container->DataObject($from);
+        }
+        catch (NoSuchObjectException $e) {
+            $this->addError('file',$this->xpdo->lexicon('file_err_ns').': '.$from);
+            return false;
+        }
+
+        if ($to != '/') {
+            if(substr($to,-1,1) !== "/") {
+                try {
+                    $obj_to = $this->container->DataObject($to);
+                }
+                catch (NoSuchObjectException $e) {
+                    $this->addError('file',$this->xpdo->lexicon('file_err_ns').': '.$to);
+                    return false;
+                }
+
+                $toPath = dirname($obj_to->name).'/';
+                if($toPath == "./") $toPath = "";
+            } else {
+                $toPath = trim($to,"/")."/";
+            }
+        } else {
+            $toPath = basename($from);
+        }
+        $toPath .= basename($obj_from->name);
+
+
+        try {
+            $mypicture = $this->container->DataObject();
+            $mypicture->name = $toPath;
+            $mypicture->Create();
+
+            $moved = $obj_from->copy($mypicture);
+        } catch(Exception $e) {
+            $this->addError('file',$this->xpdo->lexicon('file_folder_err_rename').': '.$oldPath);
+            return false;
+        }
+
+        if (!$moved) {
+            $this->addError('file',$this->xpdo->lexicon('file_folder_err_rename').': '.$oldPath);
+            return false;
+        }
+
+        $obj_from->Delete();
+
+        return $moved;
+    }
 
     /**
      * Update the contents of a specific object
@@ -748,47 +811,6 @@ $this->logger("container: $container");
             $contentType = 'octet/application-stream';
         }
         return $contentType;
-    }
-
-    /**
-     * Move a file or folder to a specific location
-     *
-     * @param string $from The location to move from
-     * @param string $to The location to move to
-     * @param string $point
-     * @return boolean
-     */
-    public function moveObject($from,$to,$point = 'append') {
-        $this->xpdo->lexicon->load('source');
-        $success = false;
-
-        try {
-            $obj_from = new CF_Object($this->container,$from,true);
-        }
-        catch (NoSuchObjectException $e) {
-            $this->addError('file',$this->xpdo->lexicon('file_err_ns').': '.$from);
-            return false;
-        }
-         
-        if ($to != '/') {
-            try {
-                $obj_to = new CF_Object($this->container,trim($to,'/'),true);
-            }    
-            catch (NoSuchObjectException $e) {
-                $this->addError('file',$this->xpdo->lexicon('file_err_ns').': '.$to);
-                return false;
-            }
-            $toPath = $obj_to->name.'/'.basename($from);
-        } else {
-            $toPath = basename($from);
-        }
-        
-        $moved = $this->container->move_object_to($obj_from, $this->container, $toPath);
-        if (!$moved) {
-            $this->xpdo->error->message = $this->xpdo->lexicon('file_folder_err_rename').': '.$to.' -> '.$from;
-        }
-
-        return $moved;
     }
 
     /**
