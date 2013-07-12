@@ -374,11 +374,7 @@ $this->logger("container: $container");
     public function removeObject($objectPath) {
         $obj = false;
         try {
-            $objlist = $this->container->ObjectList();
-            while($object = $objlist->Next()) {
-                if($object->name == $objectPath) $obj = $object;
-            }
-            if(!$obj) throw new Exception("Error Processing Request", 1);
+            $obj = $this->container->DataObject($objectPath);
         }
         catch (NoSuchObjectException $e) {
             $this->addError('file',$this->xpdo->lexicon('file_folder_err_ns').': '.$objectPath);
