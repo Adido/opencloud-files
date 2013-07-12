@@ -372,9 +372,13 @@ $this->logger("container: $container");
      * @return boolean
      */
     public function removeObject($objectPath) {
+        $obj = false;
         try {
-            $obj = new CF_Object($this->container,$objectPath,true);
-    
+            $objlist = $this->container->ObjectList();
+            while($object = $objlist->Next()) {
+                if($object->name == $objectPath) $obj = $object;
+            }
+            if(!$obj) throw new Exception("Error Processing Request", 1);
         }
         catch (NoSuchObjectException $e) {
             $this->addError('file',$this->xpdo->lexicon('file_folder_err_ns').': '.$objectPath);
@@ -382,7 +386,7 @@ $this->logger("container: $container");
         }
 
        /* remove object */
-        $deleted = $this->container->delete_object($objectPath);
+        $deleted = $obj->Delete();
 
         /* log manager action */
         $this->xpdo->logManagerAction('file_remove','',$objectPath);
