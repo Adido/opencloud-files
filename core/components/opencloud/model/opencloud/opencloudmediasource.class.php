@@ -140,11 +140,13 @@ $this->logger("container: $container");
         $directories = $files = array();
 
         while($object = $objlist->Next()) {
-            // $this->logger( print_r($object, true) );
+
+            // "ghost" directories show correctly
+            if($object->content_type == "application/directory") $object->subdir = $object->name;
 
             $isDir = isset($object->subdir);
 
-            $currentPath = (!$isDir ? $object->name : $object->subdir);
+            $currentPath = trim((!$isDir ? $object->name : $object->subdir),"/");
             $fileName = basename($currentPath);
             $extension = pathinfo($fileName,PATHINFO_EXTENSION);
 
