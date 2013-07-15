@@ -47,16 +47,11 @@ class OpencloudMediaSource extends modMediaSource implements modMediaSourceInter
 
         $username = $this->xpdo->getOption('username',$properties,'');
         $apiKey = $this->xpdo->getOption('api_key',$properties,'');
-        $authentication_service = $this->xpdo->getOption('authentication_service',$properties,'');
+        $endpoint = $this->xpdo->getOption('authentication_service',$properties,'');
         $container = $this->xpdo->getOption('container',$properties,'');
-// $this->logger("username: $username");
-// $this->logger("api_key: $apiKey");
-// $this->logger("authentication_service: $authentication_service");
-// $this->logger("container: $container");
-
 
         include_once dirname(dirname(__FILE__)).'/php-opencloud-1.5.8/lib/php-opencloud.php';
-        $endpoint = 'https://lon.identity.api.rackspacecloud.com/v2.0/';
+        $endpoint = '';
         $credentials = array(
             'username' => $username,
             'apiKey' => $apiKey,
