@@ -8,6 +8,7 @@
 
 $_lang['source_type.opencloud'] = 'OpenCloud cloudfiles Storage';
 $_lang['source_type.opencloud_desc'] = 'Navigates an OpenCloud Object Storage container (Rackspace).';
+$_lang['prop_opencloud.tenantId'] = 'The tenantId of the Object Storage container.';
 $_lang['prop_opencloud.url_desc'] = 'The URL of the OpenCloud Object Storage container.';
 $_lang['prop_opencloud.container_desc'] = 'The OpenCloud Object Storage container to load your data from.';
 $_lang['prop_opencloud.authentication_service_desc'] = 'The URL of the OpenCloud Object Storage authentication service.';

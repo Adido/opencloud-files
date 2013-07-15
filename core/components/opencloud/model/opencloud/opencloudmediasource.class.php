@@ -49,13 +49,14 @@ class OpencloudMediaSource extends modMediaSource implements modMediaSourceInter
         $apiKey = $this->xpdo->getOption('api_key',$properties,'');
         $endpoint = $this->xpdo->getOption('authentication_service',$properties,'');
         $container = $this->xpdo->getOption('container',$properties,'');
+        $tenantId = $this->xpdo->getOption('container',$properties,'');
 
         include_once dirname(dirname(__FILE__)).'/php-opencloud-1.5.8/lib/php-opencloud.php';
-        $endpoint = '';
+
         $credentials = array(
             'username' => $username,
             'apiKey' => $apiKey,
-            'tenantId' => 'MossoCloudFS_74e58090-dcaa-4458-a94f-cb5ff1cd1773'
+            'tenantId' => $tenantId
         );
         try {
             $this->cloud = new Rackspace($endpoint, $credentials);
