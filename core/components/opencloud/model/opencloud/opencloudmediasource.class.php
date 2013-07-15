@@ -109,7 +109,6 @@ class OpencloudMediaSource extends modMediaSource implements modMediaSourceInter
      */
     public function getOpencloudObjectList($path) {
         $path = trim($path,"/");
-        $this->logger('path: '.$path);
 
         $objlist = $this->container->ObjectList(array("delimiter" => "/", "prefix" => ($path ? "$path/" : '')));
         return $objlist;
@@ -289,7 +288,6 @@ class OpencloudMediaSource extends modMediaSource implements modMediaSourceInter
      * @return array
      */
     public function getObjectsInContainer($path) {
-        $this->logger('getObjectsInContainer: '. $path);
         $list = $this->getOpencloudObjectList($path);
         $properties = $this->getPropertyList();
 
@@ -416,6 +414,19 @@ class OpencloudMediaSource extends modMediaSource implements modMediaSourceInter
         return true;
     }
 
+
+    function recursiveDelete($path) {
+        $list = $this->getOpencloudObjectList($path);
+        while($obj = $list->Next()) {
+            if(isset($obj->subdir)) {
+                $this->recursiveDelete($obj->subdir);
+            } else {
+                $obj->Delete();
+            }
+        }
+
+    }
+
     /**
      * Remove an empty folder
      *
@@ -424,11 +435,7 @@ class OpencloudMediaSource extends modMediaSource implements modMediaSourceInter
      */
     public function removeContainer($path) {
         try {
-            $list = $this->getOpencloudObjectList($path);
-            while($obj = $list->Next()) {
-$this->logger('remove:'.$obj->content_type. " -- $path");
-                $obj->Delete();
-            }
+            $this->recursiveDelete($path);
             // $container = $this->container->DataObject($path);
             // $container->Delete();
         }
