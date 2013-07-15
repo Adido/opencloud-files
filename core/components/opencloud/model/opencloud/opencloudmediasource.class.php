@@ -108,7 +108,8 @@ class OpencloudMediaSource extends modMediaSource implements modMediaSourceInter
      * @return array
      */
     public function getOpencloudObjectList($path) {
-        // $this->logger( "getOpencloudObjectList: $path");
+        $path = trim($path,"/");
+        $this->logger('path: '.$path);
 
         $objlist = $this->container->ObjectList(array("delimiter" => "/", "prefix" => ($path ? "$path/" : '')));
         return $objlist;
@@ -131,7 +132,6 @@ class OpencloudMediaSource extends modMediaSource implements modMediaSourceInter
      */
     public function getContainerList($path) {
         $path = trim($path,"/");
-        // $this->logger( "getContainerList: $path");
         $properties = $this->getPropertyList();
         $hideFiles = !empty($properties['hideFiles']) && $properties['hideFiles'] != 'false' ? true : false;
 
@@ -300,6 +300,7 @@ class OpencloudMediaSource extends modMediaSource implements modMediaSourceInter
         $containerUrl = rtrim($properties['url'],'/').'/';
         $allowedFileTypes = $this->getOption('allowedFileTypes',$this->properties,'');
         $allowedFileTypes = !empty($allowedFileTypes) && is_string($allowedFileTypes) ? explode(',',$allowedFileTypes) : $allowedFileTypes;
+        $modAuth = $this->xpdo->user->getUserToken($this->xpdo->context->get('key'));
         $imageExtensions = $this->getOption('imageExtensions',$this->properties,'jpg,jpeg,png,gif');
         $imageExtensions = explode(',',$imageExtensions);
         $thumbnailType = $this->getOption('thumbnailType',$this->properties,'png');
@@ -423,12 +424,18 @@ class OpencloudMediaSource extends modMediaSource implements modMediaSourceInter
      */
     public function removeContainer($path) {
         try {
-            $container = $this->container->DataObject($path);
-            $container->Delete();
+            $list = $this->getOpencloudObjectList($path);
+            while($obj = $list->Next()) {
+$this->logger('remove:'.$obj->content_type. " -- $path");
+                $obj->Delete();
+            }
+            // $container = $this->container->DataObject($path);
+            // $container->Delete();
         }
         catch (NoSuchObjectException $e) {
-            $this->addError('file',$this->xpdo->lexicon('file_folder_err_ns').': '.$path);
-            return false;
+            // $this->addError('file',$this->xpdo->lexicon('file_folder_err_ns').': '.$path);
+            // return false;
+            // no errors here - because the folder may not exist as a directory
         }
 
         /* log manager action */
@@ -455,6 +462,7 @@ class OpencloudMediaSource extends modMediaSource implements modMediaSourceInter
      */
     public function removeObject($objectPath) {
         $obj = false;
+        $objectPath = str_replace("//", "/", $objectPath);
         try {
             $obj = $this->container->DataObject($objectPath);
         }
