@@ -13,7 +13,8 @@ class OpencloudMediaSource extends modMediaSource implements modMediaSourceInter
     /** @var $cloud */
     public $cloud;
     /** @var $container */
-    public $container;
+    public $containerObj = false;
+    public $containerName;
     /** @var $objectStore */
     public $objectStore;
 
@@ -49,7 +50,7 @@ class OpencloudMediaSource extends modMediaSource implements modMediaSourceInter
         $apiKey = $this->xpdo->getOption('api_key',$properties,'');
         $endpoint = $this->xpdo->getOption('authentication_service',$properties,'');
         $container = $this->xpdo->getOption('container',$properties,'');
-        $tenantId = $this->xpdo->getOption('container',$properties,'');
+        $tenantId = $this->xpdo->getOption('tenantId',$properties,'');
 
         include_once dirname(dirname(__FILE__)).'/php-opencloud-1.5.8/lib/php-opencloud.php';
 
@@ -60,8 +61,18 @@ class OpencloudMediaSource extends modMediaSource implements modMediaSourceInter
         );
         try {
             $this->cloud = new Rackspace($endpoint, $credentials);
-            $this->objectStore = $this->cloud->ObjectStore('cloudFiles', 'LON');
-            $this->setContainer($container);
+
+            if(function_exists('apc_fetch')) {
+                $arr = apc_fetch('opencloud-cred-'.md5(MODX_SITE_URL));
+                if($arr) {
+                    $this->cloud->ImportCredentials($arr);
+                } else {
+                    $this->cloud->Authenticate(); // retrieves credentials from identity service
+                    $arr = $this->cloud->ExportCredentials();
+                    apc_store('opencloud-cred-'.md5(MODX_SITE_URL),$arr);
+                }
+            }
+            $this->containerName = $container;
 
         } catch (Exception $e) {
             $this->xpdo->log(modX::LOG_LEVEL_ERROR,'[OpencloudMediaSource] Could not authenticate: '.$e->getMessage());
@@ -94,8 +105,9 @@ class OpencloudMediaSource extends modMediaSource implements modMediaSourceInter
      * @return void
      */
     public function setContainer($container) {
+        $this->objectStore = $this->cloud->ObjectStore('cloudFiles', 'LON');
 
-        $this->container = $this->objectStore->Container($container);
+        $this->containerObj = $this->objectStore->Container($container);
     }
 
     /**
@@ -105,8 +117,9 @@ class OpencloudMediaSource extends modMediaSource implements modMediaSourceInter
      */
     public function getOpencloudObjectList($path) {
         $path = trim($path,"/");
+        if(!$this->containerObj) $this->setContainer($this->containerName);
 
-        $objlist = $this->container->ObjectList(array("delimiter" => "/", "prefix" => ($path ? "$path/" : '')));
+        $objlist = $this->containerObj->ObjectList(array("delimiter" => "/", "prefix" => ($path ? "$path/" : '')));
         return $objlist;
     }
 
@@ -131,7 +144,8 @@ class OpencloudMediaSource extends modMediaSource implements modMediaSourceInter
         $hideFiles = !empty($properties['hideFiles']) && $properties['hideFiles'] != 'false' ? true : false;
 
          // get list of all files
-        $objlist = $this->container->ObjectList(array("delimiter" => "/", "prefix" => ($path ? "$path/" : '')));
+        if(!$this->containerObj) $this->setContainer($this->containerName);
+        $objlist = $this->containerObj->ObjectList(array("delimiter" => "/", "prefix" => ($path ? "$path/" : '')));
 
         $directories = $files = array();
 
@@ -400,7 +414,8 @@ class OpencloudMediaSource extends modMediaSource implements modMediaSourceInter
 
         $newPath = $parentContainer.trim($name,'/');
 
-        $folder = $this->container->DataObject();
+        if(!$this->containerObj) $this->setContainer($this->containerName);
+        $folder = $this->containerObj->DataObject();
         $folder->name = $newPath;
         $folder->content_type = 'application/directory';
 
@@ -432,7 +447,7 @@ class OpencloudMediaSource extends modMediaSource implements modMediaSourceInter
     public function removeContainer($path) {
         try {
             $this->recursiveDelete($path);
-            // $container = $this->container->DataObject($path);
+            // $container = $this->containerObj->DataObject($path);
             // $container->Delete();
         }
         catch (NoSuchObjectException $e) {
@@ -467,7 +482,8 @@ class OpencloudMediaSource extends modMediaSource implements modMediaSourceInter
         $obj = false;
         $objectPath = str_replace("//", "/", $objectPath);
         try {
-            $obj = $this->container->DataObject($objectPath);
+            if(!$this->containerObj) $this->setContainer($this->containerName);
+            $obj = $this->containerObj->DataObject($objectPath);
         }
         catch (NoSuchObjectException $e) {
             $this->addError('file',$this->xpdo->lexicon('file_folder_err_ns').': '.$objectPath);
@@ -491,7 +507,8 @@ class OpencloudMediaSource extends modMediaSource implements modMediaSourceInter
      */
     public function renameObject($oldPath,$newName) {
         try {
-            $obj = $this->container->DataObject($oldPath);
+            if(!$this->containerObj) $this->setContainer($this->containerName);
+            $obj = $this->containerObj->DataObject($oldPath);
         }
         catch (NoSuchObjectException $e) {
             $this->addError('file',$this->xpdo->lexicon('file_folder_err_ns').': '.$objectPath);
@@ -501,7 +518,7 @@ class OpencloudMediaSource extends modMediaSource implements modMediaSourceInter
         $dir = dirname($oldPath);
         $newPath = ($dir != '.' ? $dir.'/' : '').$newName;
 
-        $mypicture = $this->container->DataObject();
+        $mypicture = $this->containerObj->DataObject();
         $mypicture->name = $newPath;
         $mypicture->Create();
 
@@ -532,7 +549,8 @@ class OpencloudMediaSource extends modMediaSource implements modMediaSourceInter
         $success = false;
 
         try {
-            $obj_from = $this->container->DataObject($from);
+            if(!$this->containerObj) $this->setContainer($this->containerName);
+            $obj_from = $this->containerObj->DataObject($from);
         }
         catch (Exception $e) {
             $this->addError('file',$this->xpdo->lexicon('file_err_ns').': '.$from);
@@ -542,7 +560,7 @@ class OpencloudMediaSource extends modMediaSource implements modMediaSourceInter
         if ($to != '/') {
             if(substr($to,-1,1) !== "/") {
                 try {
-                    $obj_to = $this->container->DataObject($to);
+                    $obj_to = $this->containerObj->DataObject($to);
                 }
                 catch (NoSuchObjectException $e) {
                     $this->addError('file',$this->xpdo->lexicon('file_err_ns').': '.$to);
@@ -561,7 +579,7 @@ class OpencloudMediaSource extends modMediaSource implements modMediaSourceInter
 
 
         try {
-            $mypicture = $this->container->DataObject();
+            $mypicture = $this->containerObj->DataObject();
             $mypicture->name = $toPath;
             $mypicture->Create();
 
@@ -591,7 +609,7 @@ class OpencloudMediaSource extends modMediaSource implements modMediaSourceInter
     public function updateObject($objectPath,$content) {
 
         try {
-            $obj = new CF_Object($this->container,ltrim($objectPath,'/'),true);
+            $obj = new CF_Object($this->containerObj,ltrim($objectPath,'/'),true);
     
         }
         catch (NoSuchObjectException $e) {
@@ -622,7 +640,8 @@ class OpencloudMediaSource extends modMediaSource implements modMediaSourceInter
 
         $filePath = $objectPath.trim($name,'/');
 
-        $mypicture = $this->container->DataObject();
+        if(!$this->containerObj) $this->setContainer($this->containerName);
+        $mypicture = $this->containerObj->DataObject();
 
         $ok = $mypicture->Create(
             array('name'=>$name, 'content_type'=> $this->getContentType($ext)), $filePath);
@@ -655,6 +674,7 @@ class OpencloudMediaSource extends modMediaSource implements modMediaSourceInter
         $allowedFileTypes = array_unique($allowedFileTypes);
         $maxFileSize = $this->xpdo->getOption('upload_maxsize',null,1048576);
 
+        if(!$this->containerObj) $this->setContainer($this->containerName);
         /* loop through each file and upload */
         foreach ($objects as $file) {
             if ($file['error'] != 0) continue;
@@ -681,7 +701,7 @@ class OpencloudMediaSource extends modMediaSource implements modMediaSourceInter
             $newPath = $container.$file['name'];
 
 
-            $mypicture = $this->container->DataObject();
+            $mypicture = $this->containerObj->DataObject();
             $uploaded = $mypicture->Create(array('name'=>$newPath, 'content_type'=> $this->getContentType($ext)), $file['tmp_name']);
 
             if (!$uploaded) {
@@ -1034,7 +1054,7 @@ class OpencloudMediaSource extends modMediaSource implements modMediaSourceInter
         // $this->logger('getObjectContents: '. $objectPath);
         $properties = $this->getPropertyList();
         try {
-            $obj = new CF_Object($this->container,$objectPath, true);
+            $obj = new CF_Object($this->containerObj,$objectPath, true);
             $contents = $obj->read();
             $last_modified = $obj->last_modified;
             $size = $obj->content_length;
